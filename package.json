@@ -1,0 +1,14 @@
+{
+  "name": "qr-label-studio-awizohub",
+  "version": "1.0.0",
+  "description": "Web QR label studio — Chrome print-accurate, no backend",
+  "scripts": {
+    "serve": "npx serve .",
+    "lint": "npx eslint js/*.js",
+    "vendor": "powershell -ExecutionPolicy Bypass -File vendor/download-vendor.ps1"
+  },
+  "devDependencies": {
+    "serve": "^14.2.0",
+    "eslint": "^8.57.0"
+  }
+}

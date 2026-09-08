@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Awizohub — QR Label Studio</title>
+<meta name="description" content="Generate and print QR label sheets with mm accuracy. Chrome → Preview → Print / PDF. Avery, Dymo roll, 4x6 and custom.">
+<meta name="theme-color" content="#0f172a">
+<meta property="og:title" content="Awizohub — QR Label Studio">
+<meta property="og:description" content="Chrome print-accurate QR labels: Sample → Generate preview → Print / PDF.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%230f172a'/%3E%3Crect x='18' y='18' width='26' height='26' fill='white'/%3E%3Crect x='56' y='18' width='26' height='26' fill='white'/%3E%3Crect x='18' y='56' width='26' height='26' fill='white'/%3E%3Crect x='56' y='56' width='14' height='14' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bwip-js/4.3.0/bwip-js-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style id="page-style">@page { size: A4; margin: 0; }</style>
+</head>
+<body>
+
+<header class="topbar no-print">
+  <div>
+    <h1>Awizohub — QR Label Studio</h1>
+    <p>Chrome → Preview → Print / PDF · <span id="autosaveInfo">autosave ready</span></p>
+  </div>
+  <div class="top-actions">
+    <button onclick="togglePanel()" class="btn secondary only-mobile">☰ Panel</button>
+    <button onclick="generateDemo()" class="btn secondary">Sample</button>
+    <button onclick="renderCalibration()" class="btn secondary">Calibration page</button>
+    <a class="btn secondary" href="#print-guide" onclick="document.body.classList.remove('panel-collapsed')" style="text-decoration:none">📖 Guide</a>
+    <button onclick="doPrint()" class="btn primary">🖨 Print</button>
+    <button onclick="downloadPDF()" class="btn secondary">⬇ PDF</button>
+  </div>
+</header>
+
+<main>
+  <aside class="panel no-print" id="panel">
+    <section>
+      <h2>1. Data</h2>
+      <textarea id="dataInput" rows="6" placeholder="One value per line…&#10;https://awizohub.com/p/001"></textarea>
+      <div class="row">
+        <label class="file-btn">📁 CSV <input type="file" id="csvFile" accept=".csv,.txt" hidden></label>
+        <label title="Which CSV column to use">Col <input type="number" id="csvCol" value="0" min="0" max="20" style="width:52px"></label>
+        <button class="btn small" onclick="clearData()">Clear</button>
+        <button class="btn small" onclick="undoEdit()">Undo</button>
+        <span id="count" class="count">0 labels</span>
+      </div>
+      <div id="csvInfo" class="csvinfo"></div>
+      <div id="validationBox" class="vbox"></div>
+      <div class="row">
+        <label>Symbology <select id="symbology"></select></label>
+        <label>EC <select id="eclevel"><option value="L">L (7%)</option><option value="M" selected>M (15%)</option><option value="Q">Q (25%)</option><option value="H">H (30%)</option></select></label>
+        <label>Quiet <input type="number" id="quiet" value="2" min="0" max="8" title="Quiet zone padding (≥2 = 4 modules)"></label>
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="showText" checked> Text</label>
+        <label>Font pt <input type="number" id="fontPt" value="7" min="5" max="14"></label>
+        <label>Logo <input type="file" id="logoFile" accept="image/*"></label>
+        <button class="btn small" id="logoRemove" onclick="removeLogo()" style="display:none" title="Remove logo">✕</button>
+      </div>
+      <div id="logoInfo" class="csvinfo"></div>
+    </section>
+
+    <section>
+      <h2>2. Template</h2>
+      <select id="template">
+        <option value="avery7160" selected>Avery L7160 — 63.5×38.1mm 3×7 A4</option>
+        <option value="dymo30334">Dymo 30334 — 50×30mm roll</option>
+        <option value="ship4x6">Shipping 4×6" — 102×152mm</option>
+        <option value="mini40x30">Mini 40×30mm 4×8 A4</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <div class="row">
+        <input id="tplName" placeholder="My template name…" style="flex:2">
+        <button class="btn small" onclick="saveUserTpl()">Save ★</button>
+        <button class="btn small" onclick="deleteUserTpl()">Del</button>
+        <button class="btn small" onclick="exportTpls()">Export JSON</button>
+      </div>
+      <div class="row">
+        <label>Mode <select id="mode"><option value="sheet">Sheet</option><option value="roll">Roll</option></select></label>
+        <label>Zoom <input type="range" id="zoom" min="40" max="120" value="70"></label>
+      </div>
+      <div class="grid4">
+        <label>W<input type="number" id="labelW" value="63.5" step="0.5"></label>
+        <label>H<input type="number" id="labelH" value="38.1" step="0.5"></label>
+        <label>GapX<input type="number" id="gapX" value="2.5" step="0.5"></label>
+        <label>GapY<input type="number" id="gapY" value="0" step="0.5"></label>
+        <label>Cols<input type="number" id="cols" value="3" min="1" max="10"></label>
+        <label>Rows<input type="number" id="rows" value="7" min="1" max="50"></label>
+        <label>MargL<input type="number" id="marginL" value="7" step="0.5"></label>
+        <label>MargT<input type="number" id="marginT" value="13" step="0.5"></label>
+      </div>
+      <div class="grid4">
+        <label>CalX<input type="number" id="offX" value="0" step="0.5"></label>
+        <label>CalY<input type="number" id="offY" value="0" step="0.5"></label>
+        <label>Radius<input type="number" id="radius" value="0" step="0.5" min="0" title="Rounded corners"></label>
+        <label>SensGap<input type="number" id="sensorGap" value="0" step="0.5" min="0" title="Thermal gap-sensor extra"></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Render</h2>
+      <button onclick="renderAll(0)" class="btn primary big">Generate preview</button>
+      <div class="row">
+        <label style="flex:2">PDF name <input id="pdfName" placeholder="awizohub-labels" value="awizohub-labels"></label>
+      </div>
+      <div class="guide" id="print-guide">
+        <h3>📖 Print guide — mm accuracy</h3>
+        <ol>
+          <li><b>Generate preview</b>, then <b>Print</b>.</li>
+          <li>In the Chrome dialog set: Margins <b>None</b>, Scale <b>100%</b> (never "Fit to page"), ☑ <b>Background graphics</b>.</li>
+          <li>Paper: <b>A4</b> for Avery/Mini sheets; roll width (e.g. 54mm) for Dymo; 102×152mm for 4×6".</li>
+          <li>First time: print <b>Calibration page</b> and measure the 100mm ruler with a real ruler.</li>
+        </ol>
+        <p><b>Laser/Inkjet (A4):</b> A4 in tray, correct template. Dashed borders are screen-only, never printed.<br>
+        <b>Thermal (roll):</b> Mode Roll, paper = roll width. Skips a label? Raise <b>SensGap</b> by 1–2mm.</p>
+        <table>
+          <tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+          <tr><td>All shrunk</td><td>Scale Fit</td><td>Scale 100%</td></tr>
+          <tr><td>White border, shifted</td><td>Margins Default</td><td>Margins None</td></tr>
+          <tr><td>Faded QR</td><td>Background OFF / draft</td><td>Background ON, High quality</td></tr>
+          <tr><td>Skips every other label</td><td>SensGap 0 on thermal</td><td>SensGap 2mm</td></tr>
+          <tr><td>100mm ruler ≠ 100mm</td><td>Wrong scale</td><td>Check Scale 100%</td></tr>
+          <tr><td>Shifted ±1mm</td><td>Printer offset</td><td>Set CalX/CalY</td></tr>
+        </table>
+        <p class="src">Full version with Win/Mac notes: <b>docs/PRINT_GUIDE.md</b>.</p>
+      </div>
+    </section>
+  </aside>
+
+  <section class="stage">
+    <div id="cdnWarn" class="cdnwarn no-print" style="display:none"></div>
+    <div id="previewMeta" class="meta no-print">Paste data or load CSV → Generate preview</div>
+    <div id="previewZoom"><div id="preview"></div></div>
+    <div id="pager" class="no-print pager"></div>
+  </section>
+</main>
+
+<script src="js/csv.js"></script>
+<script src="js/validate.js"></script>
+<script src="js/qr.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/store.js"></script>
+<script src="js/print.js"></script>
+<script src="js/pdf.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
